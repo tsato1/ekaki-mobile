@@ -3,6 +3,8 @@ package com.tsato.mobile.ekaki.di
 import android.content.Context
 import com.google.gson.Gson
 import com.tsato.mobile.ekaki.data.remote.api.SetupApi
+import com.tsato.mobile.ekaki.repository.DefaultSetupRepository
+import com.tsato.mobile.ekaki.repository.SetupRepository
 import com.tsato.mobile.ekaki.util.Constants.HTTP_BASE_URL
 import com.tsato.mobile.ekaki.util.Constants.HTTP_BASE_URL_LOCALHOST
 import com.tsato.mobile.ekaki.util.Constants.USE_LOCALHOST
@@ -27,6 +29,13 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+
+    @Singleton
+    @Provides
+    fun provideSetupRepository(
+        setupApi: SetupApi,
+        @ApplicationContext context: Context
+    ) : SetupRepository = DefaultSetupRepository(setupApi, context)
 
     @Singleton // means the client that is returned from this func is a singleton
     @Provides

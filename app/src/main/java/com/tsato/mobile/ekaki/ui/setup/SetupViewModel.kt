@@ -33,7 +33,7 @@ class SetupViewModel @Inject constructor(
         data class CreateRoomErrorEvent(val error: String) : SetupEvent()
 
         data class NavigateToSelectRoomEvent(val userName: String) : SetupEvent()
-        data class NavigateToSelectRoomErrorEvent(val error: String) : SetupEvent()
+//        data class NavigateToSelectRoomErrorEvent(val error: String) : SetupEvent() // no need
 
         data class GetRoomEvent(val rooms: List<Room>) : SetupEvent()
         data class GetRoomErrorEvent(val error: String) : SetupEvent()

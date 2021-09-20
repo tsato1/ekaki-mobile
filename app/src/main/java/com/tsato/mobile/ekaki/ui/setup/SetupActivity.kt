@@ -5,7 +5,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.tsato.mobile.ekaki.R
 import com.tsato.mobile.ekaki.databinding.ActivitySetupBinding
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class SetupActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySetupBinding
