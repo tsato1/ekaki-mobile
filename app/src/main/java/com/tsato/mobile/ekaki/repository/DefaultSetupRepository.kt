@@ -16,12 +16,12 @@ class DefaultSetupRepository @Inject constructor(
 ): SetupRepository {
 
     override suspend fun createRoom(room: Room): Resource<Unit> {
-        if (!context.checkForInternetConnection()) { // just checks if the user turned on internet connection transports
+        if (!context.checkForInternetConnection()) { // just checks if internet connection transports are turned on
             return Resource.Error(context.getString(R.string.error_internet_turned_off))
         }
 
         // internet should be turned on from here after
-        // catching the case when the setup for internet is on, but the router has problems
+        // catching the case when the setup for internet is on, but there are some other problems
         val response = try{
             setupApi.createRoom(room)
         }
@@ -45,12 +45,12 @@ class DefaultSetupRepository @Inject constructor(
     }
 
     override suspend fun getRooms(searchQuery: String): Resource<List<Room>> {
-        if (!context.checkForInternetConnection()) { // just checks if the user turned on internet connection transports
+        if (!context.checkForInternetConnection()) { // just checks if internet connection transports are turned on
             return Resource.Error(context.getString(R.string.error_internet_turned_off))
         }
 
         // internet should be turned on from here after
-        // catching the case when the setup for internet is on, but the router has problems
+        // catching the case when the setup for internet is on, but there are some other problems
         val response = try{
             setupApi.getRooms(searchQuery)
         }
@@ -71,12 +71,12 @@ class DefaultSetupRepository @Inject constructor(
     }
 
     override suspend fun joinRoom(userName: String, roomName: String): Resource<Unit> {
-        if (!context.checkForInternetConnection()) { // just checks if the user turned on internet connection transports
+        if (!context.checkForInternetConnection()) { // just checks if internet connection transports are turned on
             return Resource.Error(context.getString(R.string.error_internet_turned_off))
         }
 
         // internet should be turned on from here after
-        // catching the case when the setup for internet is on, but the router has problems
+        // catching the case when the setup for internet is on, but there are some other problems
         val response = try{
             setupApi.joinRoom(userName, roomName)
         }

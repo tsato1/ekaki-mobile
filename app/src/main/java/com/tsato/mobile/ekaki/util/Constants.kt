@@ -12,4 +12,9 @@ object Constants {
             if we want to use our phone, instead of emulators, use the ipv4 address from ipconfig
          */
 
+    const val MIN_USERNAME_LENGTH = 4
+    const val MAX_USERNAME_LENGTH = 12
+
+    const val MIN_ROOMNAME_LENGTH = 4
+    const val MAX_ROOMNAME_LENGTH = 12
 }
