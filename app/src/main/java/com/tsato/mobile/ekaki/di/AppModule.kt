@@ -1,5 +1,6 @@
 package com.tsato.mobile.ekaki.di
 
+import android.content.Context
 import com.google.gson.Gson
 import com.tsato.mobile.ekaki.data.remote.api.SetupApi
 import com.tsato.mobile.ekaki.util.Constants.HTTP_BASE_URL
@@ -9,6 +10,7 @@ import com.tsato.mobile.ekaki.util.DispatcherProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +21,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
 
 /*
-    contains all of our dependencies that are bounded to the application life time (singletons)
+    contains all of our dependencies that are bounded to the application for life time (singletons)
  */
 
 @Module
@@ -48,6 +50,12 @@ object AppModule {
             .build()
             .create(SetupApi::class.java)
     }
+
+    @Singleton
+    @Provides
+    fun provideApplicationContext(
+        @ApplicationContext context: Context
+    ) = context
 
     @Singleton
     @Provides

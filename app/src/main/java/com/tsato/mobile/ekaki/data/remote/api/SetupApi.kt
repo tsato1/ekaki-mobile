@@ -25,4 +25,5 @@ interface SetupApi {
         @Query("userName") userName: String,
         @Query("roomName") roomName: String
     ): Response<BasicApiResponse>
+
 }
