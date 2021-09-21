@@ -3,19 +3,18 @@ package com.tsato.mobile.ekaki.ui.setup.fragments
 import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.activityViewModels
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.tsato.mobile.ekaki.R
 import com.tsato.mobile.ekaki.databinding.FragmentUsernameBinding
-import com.tsato.mobile.ekaki.ui.setup.SetupViewModel
+import com.tsato.mobile.ekaki.ui.setup.UserNameViewModel
 import com.tsato.mobile.ekaki.util.Constants.MAX_USERNAME_LENGTH
 import com.tsato.mobile.ekaki.util.Constants.MIN_USERNAME_LENGTH
 import com.tsato.mobile.ekaki.util.navigateSafely
 import com.tsato.mobile.ekaki.util.snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class UserNameFragment : Fragment(R.layout.fragment_username) {
@@ -24,7 +23,7 @@ class UserNameFragment : Fragment(R.layout.fragment_username) {
     private val binding: FragmentUsernameBinding
         get() = _binding!!
 
-    private val viewModel: SetupViewModel by activityViewModels()
+    private val viewModel: UserNameViewModel by viewModels()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -45,7 +44,7 @@ class UserNameFragment : Fragment(R.layout.fragment_username) {
                 // equivalent of observe in livedata, it's sharedflow not stateflow
 
                 when (event) {
-                    is SetupViewModel.SetupEvent.NavigateToSelectRoomEvent -> {
+                    is UserNameViewModel.SetupEvent.NavigateToSelectRoomEvent -> {
 //                        findNavController().navigate(
 //                            UserNameFragmentDirections.actionUserNameFragmentToSelectRoomFragment(
 //                                event.userName
@@ -56,13 +55,13 @@ class UserNameFragment : Fragment(R.layout.fragment_username) {
                             args = Bundle().apply { putString("userName", event.userName) }
                         )
                     }
-                    is SetupViewModel.SetupEvent.InputEmptyError -> {
+                    is UserNameViewModel.SetupEvent.InputEmptyError -> {
                         snackbar(R.string.error_field_empty)
                     }
-                    is SetupViewModel.SetupEvent.InputTooShortError -> {
+                    is UserNameViewModel.SetupEvent.InputTooShortError -> {
                         snackbar(getString(R.string.error_username_too_short, MIN_USERNAME_LENGTH))
                     }
-                    is SetupViewModel.SetupEvent.InputTooLongError -> {
+                    is UserNameViewModel.SetupEvent.InputTooLongError -> {
                         snackbar(getString(R.string.error_username_too_long, MAX_USERNAME_LENGTH))
                     }
                     else -> Unit
