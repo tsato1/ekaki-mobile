@@ -9,6 +9,8 @@ import com.tsato.mobile.ekaki.util.Constants.HTTP_BASE_URL
 import com.tsato.mobile.ekaki.util.Constants.HTTP_BASE_URL_LOCALHOST
 import com.tsato.mobile.ekaki.util.Constants.USE_LOCALHOST
 import com.tsato.mobile.ekaki.util.DispatcherProvider
+import com.tsato.mobile.ekaki.util.clientId
+import com.tsato.mobile.ekaki.util.dataStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -16,6 +18,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -39,14 +42,31 @@ object AppModule {
 
     @Singleton // means the client that is returned from this func is a singleton
     @Provides
-    fun probideOkHttpClient(): OkHttpClient {
+    fun probideOkHttpClient(clientId: String): OkHttpClient {
         // interceptor modifies any request that is sent by this OkHttp client
         return OkHttpClient
             .Builder()
+            .addInterceptor { chain -> // chain contains info of current request we want to send to api
+                val url = chain.request().url
+                    .newBuilder()
+                    .addQueryParameter("client_id", clientId)
+                    .build()
+                val request = chain.request()
+                    .newBuilder()
+                    .url(url)
+                    .build()
+                chain.proceed(request) // proceed to the next interceptor
+            }
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             })
             .build()
+    }
+
+    @Singleton
+    @Provides
+    fun provideClientId(@ApplicationContext context: Context): String {
+        return runBlocking { context.dataStore.clientId() }
     }
 
     @Singleton
