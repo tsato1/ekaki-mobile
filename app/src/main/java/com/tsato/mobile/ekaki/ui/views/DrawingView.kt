@@ -6,7 +6,9 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.MotionEvent.*
 import android.view.View
+import com.tsato.mobile.ekaki.data.models.DrawData
 import com.tsato.mobile.ekaki.util.Constants
+import java.lang.IllegalStateException
 import java.util.*
 import kotlin.math.abs
 
@@ -39,8 +41,21 @@ class DrawingView @JvmOverloads constructor(
 
     private var path = Path()
     private var paths = Stack<PathData>()
-    private var pathDataChangedListener: ((Stack<PathData>) -> Unit)? = null
 
+    var roomName: String? = null
+    var isUserDrawing = false
+        set(value) {
+            isEnabled = value // onTouchEvent() also handles isEnabled
+            field = value
+        }
+
+    // gets triggered when a drawer is moving a finger on screen and send the coordinates to the other players
+    private var onDrawListener: ((DrawData) -> Unit)? = null
+    fun setOnDrawListener(listener: (DrawData) -> Unit) {
+        onDrawListener = listener
+    }
+
+    private var pathDataChangedListener: ((Stack<PathData>) -> Unit)? = null
     fun setPathDataChangedListener(listener: (Stack<PathData>) -> Unit) {
         pathDataChangedListener = listener
     }
@@ -88,6 +103,12 @@ class DrawingView @JvmOverloads constructor(
         path.moveTo(x, y)
         currX = x
         currY = y
+
+        onDrawListener?.let { draw ->
+            val drawData = createDrawData(x, y, x, y, ACTION_DOWN)
+            draw(drawData)
+        }
+
         invalidate() // triggers onDraw()
     }
 
@@ -100,6 +121,11 @@ class DrawingView @JvmOverloads constructor(
         if (deltaX >= smoothness || deltaY >= smoothness) {
             isDrawing = true
             path.quadTo(currX!!, currY!!, (currX!! + toX) / 2f, (currY!! + toY) / 2f) // *
+
+            onDrawListener?.let { draw ->
+                val drawData = createDrawData(currX!!, currY!!, toX, toY, ACTION_MOVE)
+                draw(drawData)
+            }
 
             currX = toX
             currY = toY
@@ -114,6 +140,12 @@ class DrawingView @JvmOverloads constructor(
         pathDataChangedListener?.let { change ->
             change(paths)
         }
+
+        onDrawListener?.let { draw ->
+            val drawData = createDrawData(currX!!, currY!!, currX!!, currY!!, ACTION_UP)
+            draw(drawData)
+        }
+
         path = Path()
         invalidate()
     }
@@ -137,6 +169,26 @@ class DrawingView @JvmOverloads constructor(
         }
 
         return true //super.onTouchEvent(event) //no need this
+    }
+
+    // just creates DrawData object with corresponding values in this DrawingView
+    private fun createDrawData(
+        fromX: Float,
+        fromY: Float,
+        toX: Float,
+        toY: Float,
+        motionEvent: Int
+    ) : DrawData {
+        return DrawData(
+            roomName ?: throw IllegalStateException("Must set the room name in drawing view"),
+            paint.color,
+            paint.strokeWidth,
+            fromX / viewWidth!!, // don't use absolute coordinates
+        fromY / viewHeight!!, // it has to be proportionate to the screen size of the phone
+            toX / viewWidth!!,
+            toY / viewHeight!!,
+            motionEvent
+        )
     }
 
     fun setThickness(thickness: Float) {
