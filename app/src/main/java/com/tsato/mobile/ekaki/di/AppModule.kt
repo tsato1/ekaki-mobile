@@ -1,13 +1,24 @@
 package com.tsato.mobile.ekaki.di
 
+import android.app.Application
 import android.content.Context
 import com.google.gson.Gson
+import com.tinder.scarlet.Scarlet
+import com.tinder.scarlet.lifecycle.android.AndroidLifecycle
+import com.tinder.scarlet.retry.LinearBackoffStrategy
+import com.tinder.scarlet.websocket.okhttp.newWebSocketFactory
 import com.tsato.mobile.ekaki.data.remote.api.SetupApi
+import com.tsato.mobile.ekaki.data.remote.ws.CustomGsonMessageAdapter
+import com.tsato.mobile.ekaki.data.remote.ws.DrawingApi
+import com.tsato.mobile.ekaki.data.remote.ws.FlowStreamAdapter
 import com.tsato.mobile.ekaki.repository.DefaultSetupRepository
 import com.tsato.mobile.ekaki.repository.SetupRepository
 import com.tsato.mobile.ekaki.util.Constants.HTTP_BASE_URL
 import com.tsato.mobile.ekaki.util.Constants.HTTP_BASE_URL_LOCALHOST
+import com.tsato.mobile.ekaki.util.Constants.RECONNECT_INTERVAL
 import com.tsato.mobile.ekaki.util.Constants.USE_LOCALHOST
+import com.tsato.mobile.ekaki.util.Constants.WS_BASE_URL
+import com.tsato.mobile.ekaki.util.Constants.WS_BASE_URL_LOCALHOST
 import com.tsato.mobile.ekaki.util.DispatcherProvider
 import com.tsato.mobile.ekaki.util.clientId
 import com.tsato.mobile.ekaki.util.dataStore
@@ -18,6 +29,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -29,6 +41,7 @@ import javax.inject.Singleton
     contains all of our dependencies that are bounded to the application for life time (singletons)
  */
 
+@ExperimentalCoroutinesApi
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
@@ -42,7 +55,7 @@ object AppModule {
 
     @Singleton // means the client that is returned from this func is a singleton
     @Provides
-    fun probideOkHttpClient(clientId: String): OkHttpClient {
+    fun provideOkHttpClient(clientId: String): OkHttpClient {
         // interceptor modifies any request that is sent by this OkHttp client
         return OkHttpClient
             .Builder()
@@ -71,9 +84,36 @@ object AppModule {
 
     @Singleton
     @Provides
+    fun provideDrawingApi(
+        app: Application, // hilt automatically provides this
+        okHttpClient: OkHttpClient, // the function provideOkHttpClient will provides this
+        gson: Gson
+    ) : DrawingApi {
+        return Scarlet.Builder()
+            // used if things go wrong, such as unexpected disconnection
+            .backoffStrategy(LinearBackoffStrategy(RECONNECT_INTERVAL))
+            // Scarlet will detect if the app is out of lifecycle
+            .lifecycle(AndroidLifecycle.ofApplicationForeground(app))
+            // to which url we want to connect
+            .webSocketFactory(
+                okHttpClient.newWebSocketFactory(if (USE_LOCALHOST) WS_BASE_URL_LOCALHOST else WS_BASE_URL)
+            )
+            // transforms incoming data to object that we want to have.
+            // in DrawingApi, we want to use Flow, but Scarlet doesn't know how to transform
+            // incoming json data into Flow. We create our own Factory to do this: FlowStreamAdapter.kt
+            .addStreamAdapterFactory(FlowStreamAdapter.Factory)
+            // equivalent to addConverterFactory in Retrofit
+            .addMessageAdapterFactory(CustomGsonMessageAdapter.Factory(gson))
+            .build()
+            .create()
+    }
+
+    @Singleton
+    @Provides
     fun provideSetupApi(okHttpClient: OkHttpClient): SetupApi {
         return Retrofit.Builder()
             .baseUrl(if (USE_LOCALHOST) HTTP_BASE_URL_LOCALHOST else HTTP_BASE_URL)
+            // automates parsing incoming websocket json data to our data classes
             .addConverterFactory(GsonConverterFactory.create())
             .client(okHttpClient)
             .build()
