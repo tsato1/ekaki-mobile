@@ -1,6 +1,5 @@
 package com.tsato.mobile.ekaki.data.models
 
-import com.tsato.mobile.data.models.BaseModel
 import com.tsato.mobile.ekaki.util.Constants.TYPE_ANNOUNCEMENT
 
 data class Announcement(

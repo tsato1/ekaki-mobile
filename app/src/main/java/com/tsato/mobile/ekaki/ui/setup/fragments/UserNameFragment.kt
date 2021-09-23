@@ -11,6 +11,7 @@ import com.tsato.mobile.ekaki.databinding.FragmentUsernameBinding
 import com.tsato.mobile.ekaki.ui.setup.UserNameViewModel
 import com.tsato.mobile.ekaki.util.Constants.MAX_USERNAME_LENGTH
 import com.tsato.mobile.ekaki.util.Constants.MIN_USERNAME_LENGTH
+import com.tsato.mobile.ekaki.util.hideKeyboard
 import com.tsato.mobile.ekaki.util.navigateSafely
 import com.tsato.mobile.ekaki.util.snackbar
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,6 +36,7 @@ class UserNameFragment : Fragment(R.layout.fragment_username) {
             viewModel.validateUserNameAndNavigateToSelectRoom(
                 binding.etUsername.text.toString()
             )
+            requireActivity().hideKeyboard(binding.root)
         }
     }
 

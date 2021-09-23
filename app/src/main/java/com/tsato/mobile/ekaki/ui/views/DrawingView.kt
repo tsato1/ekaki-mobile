@@ -42,6 +42,7 @@ class DrawingView @JvmOverloads constructor(
     private var path = Path()
     private var paths = Stack<PathData>()
 
+    private var startedTouch = false // Android System sometimes send ACTION_MOVE before ACTION_STARTED
     var roomName: String? = null
     var isUserDrawing = false
         set(value) {
@@ -95,6 +96,36 @@ class DrawingView @JvmOverloads constructor(
         canvas?.drawPath(path, paint)
     }
 
+    override fun setEnabled(enabled: Boolean) {
+        super.setEnabled(enabled)
+        path.reset() // handles the case when the time runs out and the player is still drawing
+        invalidate()
+    }
+
+    fun undo() {
+        if (!paths.isEmpty()) {
+            paths.pop()
+            pathDataChangedListener?.let { change ->
+                change(paths)
+            }
+            invalidate()
+        }
+    }
+
+    /*
+        receives DrawData from API and simulate the touch event
+     */
+    fun simulateStartedTouch(drawData: DrawData) {
+        parseDrawData(drawData).apply {
+            paint.color = color
+            paint.strokeWidth = thickness
+            path.reset() // because it is startedTouch. new path is created
+            path.moveTo(fromX, fromY)
+            invalidate()
+            startedTouch = true
+        }
+    }
+
     /*
         called when the player touches the screen for the first time
      */
@@ -110,6 +141,22 @@ class DrawingView @JvmOverloads constructor(
         }
 
         invalidate() // triggers onDraw()
+    }
+
+    fun simulateMovedTouch(drawData: DrawData) {
+        parseDrawData(drawData).apply {
+            val deltaX = abs(toX - fromX)
+            val deltaY = abs(toY - fromY)
+
+            if (!startedTouch) { // simulateStartedTouch() hasn't been called before this function
+                simulateStartedTouch(drawData)
+            }
+
+            if (deltaX >= smoothness || deltaY >= smoothness) {
+                path.quadTo(fromX, fromY, (fromX + toX) / 2f, (fromY + toY) / 2f) // *
+                invalidate()
+            }
+        }
     }
 
     private fun movedTouch(toX: Float, toY: Float) {
@@ -133,7 +180,21 @@ class DrawingView @JvmOverloads constructor(
         }
     }
 
-    private fun releaseTouch() {
+    fun simulateReleasedTouch(drawData: DrawData) {
+        parseDrawData(drawData).apply {
+            path.lineTo(fromX, fromY)
+            canvas?.drawPath(path, paint)
+            paths.push(PathData(path, paint.color, paint.strokeWidth))
+            pathDataChangedListener?.let { change ->
+                change(paths)
+            }
+            path = Path()
+            invalidate()
+            startedTouch = false
+        }
+    }
+
+    private fun releasedTouch() {
         isDrawing = false
         path.lineTo(currX ?: return, currY ?: return)
         paths.push(PathData(path, paint.color, paint.strokeWidth))
@@ -165,10 +226,20 @@ class DrawingView @JvmOverloads constructor(
         when (event?.action) {
             ACTION_DOWN -> startedTouch(newX ?: return false, newY ?: return false)
             ACTION_MOVE -> movedTouch(newX ?: return false, newY ?: return false)
-            ACTION_UP -> releaseTouch()
+            ACTION_UP -> releasedTouch()
         }
 
         return true //super.onTouchEvent(event) //no need this
+    }
+
+    // after receiving DrawData, calculate back the percentage to actual pixels size
+    private fun parseDrawData(drawData: DrawData) : DrawData {
+        return drawData.copy(
+            fromX = drawData.fromX * viewWidth!!,
+            fromY = drawData.fromY * viewHeight!!,
+            toX = drawData.toX * viewWidth!!,
+            toY = drawData.toY * viewHeight!!
+        )
     }
 
     // just creates DrawData object with corresponding values in this DrawingView
@@ -183,7 +254,7 @@ class DrawingView @JvmOverloads constructor(
             roomName ?: throw IllegalStateException("Must set the room name in drawing view"),
             paint.color,
             paint.strokeWidth,
-            fromX / viewWidth!!, // don't use absolute coordinates
+            fromX / viewWidth!!, // don't use absolute coordinates. use percentage
         fromY / viewHeight!!, // it has to be proportionate to the screen size of the phone
             toX / viewWidth!!,
             toY / viewHeight!!,

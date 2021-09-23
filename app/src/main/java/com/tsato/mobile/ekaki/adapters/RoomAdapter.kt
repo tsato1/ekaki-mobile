@@ -18,7 +18,7 @@ class RoomAdapter @Inject constructor() : RecyclerView.Adapter<RoomAdapter.RoomV
     /*
         this function suspends as long as this update operation lasts for the recyclerview
 
-        using default dispatcher because it is pu-heavy algorithms
+        uses default dispatcher because it is cpu-heavy algorithms
      */
     suspend fun updateDataSet(newDataSet: List<Room>) = withContext(Dispatchers.Default) {
         val diff = DiffUtil.calculateDiff(object: DiffUtil.Callback() {

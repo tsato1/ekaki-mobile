@@ -16,6 +16,7 @@ import com.tsato.mobile.ekaki.databinding.FragmentCreateRoomBinding
 import com.tsato.mobile.ekaki.ui.setup.CreateRoomViewModel
 import com.tsato.mobile.ekaki.util.Constants.MAX_ROOMNAME_LENGTH
 import com.tsato.mobile.ekaki.util.Constants.MIN_ROOMNAME_LENGTH
+import com.tsato.mobile.ekaki.util.hideKeyboard
 import com.tsato.mobile.ekaki.util.navigateSafely
 import com.tsato.mobile.ekaki.util.snackbar
 import dagger.hilt.android.AndroidEntryPoint
@@ -46,6 +47,7 @@ class CreateRoomFragment : Fragment(R.layout.fragment_create_room) {
                     binding.tvMaxPersons.text.toString().toInt()
                 )
             )
+            requireActivity().hideKeyboard(binding.root)
         }
     }
 

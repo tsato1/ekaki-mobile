@@ -46,13 +46,6 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
-    @Singleton
-    @Provides
-    fun provideSetupRepository(
-        setupApi: SetupApi,
-        @ApplicationContext context: Context
-    ) : SetupRepository = DefaultSetupRepository(setupApi, context)
-
     @Singleton // means the client that is returned from this func is a singleton
     @Provides
     fun provideOkHttpClient(clientId: String): OkHttpClient {
@@ -80,44 +73,6 @@ object AppModule {
     @Provides
     fun provideClientId(@ApplicationContext context: Context): String {
         return runBlocking { context.dataStore.clientId() }
-    }
-
-    @Singleton
-    @Provides
-    fun provideDrawingApi(
-        app: Application, // hilt automatically provides this
-        okHttpClient: OkHttpClient, // the function provideOkHttpClient will provides this
-        gson: Gson
-    ) : DrawingApi {
-        return Scarlet.Builder()
-            // used if things go wrong, such as unexpected disconnection
-            .backoffStrategy(LinearBackoffStrategy(RECONNECT_INTERVAL))
-            // Scarlet will detect if the app is out of lifecycle
-            .lifecycle(AndroidLifecycle.ofApplicationForeground(app))
-            // to which url we want to connect
-            .webSocketFactory(
-                okHttpClient.newWebSocketFactory(if (USE_LOCALHOST) WS_BASE_URL_LOCALHOST else WS_BASE_URL)
-            )
-            // transforms incoming data to object that we want to have.
-            // in DrawingApi, we want to use Flow, but Scarlet doesn't know how to transform
-            // incoming json data into Flow. We create our own Factory to do this: FlowStreamAdapter.kt
-            .addStreamAdapterFactory(FlowStreamAdapter.Factory)
-            // equivalent to addConverterFactory in Retrofit
-            .addMessageAdapterFactory(CustomGsonMessageAdapter.Factory(gson))
-            .build()
-            .create()
-    }
-
-    @Singleton
-    @Provides
-    fun provideSetupApi(okHttpClient: OkHttpClient): SetupApi {
-        return Retrofit.Builder()
-            .baseUrl(if (USE_LOCALHOST) HTTP_BASE_URL_LOCALHOST else HTTP_BASE_URL)
-            // automates parsing incoming websocket json data to our data classes
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(okHttpClient)
-            .build()
-            .create(SetupApi::class.java)
     }
 
     @Singleton
