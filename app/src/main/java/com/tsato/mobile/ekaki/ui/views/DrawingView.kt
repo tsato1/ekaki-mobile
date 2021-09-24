@@ -6,6 +6,9 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.MotionEvent.*
 import android.view.View
+import com.tsato.mobile.ekaki.data.models.BaseModel
+import com.tsato.mobile.ekaki.data.models.DrawAction
+import com.tsato.mobile.ekaki.data.models.DrawAction.Companion.ACTION_UNDO
 import com.tsato.mobile.ekaki.data.models.DrawData
 import com.tsato.mobile.ekaki.util.Constants
 import java.lang.IllegalStateException
@@ -59,6 +62,27 @@ class DrawingView @JvmOverloads constructor(
     private var pathDataChangedListener: ((Stack<PathData>) -> Unit)? = null
     fun setPathDataChangedListener(listener: (Stack<PathData>) -> Unit) {
         pathDataChangedListener = listener
+    }
+
+    // loop through the drawActions passed from the server,
+    // simulate the pass and drawActions(undo) in the same order that the player send to the server
+    fun update(drawActions: List<BaseModel>) {
+        drawActions.forEach { drawAction ->
+            when (drawAction) {
+                is DrawData -> {
+                    when (drawAction.motionEvent) {
+                        ACTION_DOWN -> simulateStartedTouch(drawAction)
+                        ACTION_MOVE -> simulateMovedTouch(drawAction)
+                        ACTION_UP -> simulateReleasedTouch(drawAction)
+                    }
+                }
+                is DrawAction -> {
+                    when (drawAction.action) {
+                        ACTION_UNDO -> undo()
+                    }
+                }
+            }
+        }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

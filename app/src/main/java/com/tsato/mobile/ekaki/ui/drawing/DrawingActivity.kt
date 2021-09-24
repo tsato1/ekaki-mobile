@@ -12,7 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.isVisible
 import androidx.drawerlayout.widget.DrawerLayout
-import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.*
 import androidx.navigation.navArgs
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -20,6 +20,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.tinder.scarlet.WebSocket
 import com.tsato.mobile.ekaki.R
 import com.tsato.mobile.ekaki.adapters.ChatMessageAdapter
+import com.tsato.mobile.ekaki.adapters.PlayerAdapter
 import com.tsato.mobile.ekaki.data.models.*
 import com.tsato.mobile.ekaki.data.remote.ws.Room
 import com.tsato.mobile.ekaki.databinding.ActivityDrawingBinding
@@ -32,7 +33,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class DrawingActivity : AppCompatActivity() {
+class DrawingActivity : AppCompatActivity(), LifecycleObserver {
 
     private lateinit var binding: ActivityDrawingBinding
 
@@ -45,15 +46,19 @@ class DrawingActivity : AppCompatActivity() {
 
     private lateinit var toggle: ActionBarDrawerToggle
     private lateinit var rvPlayers: RecyclerView
+    @Inject
+    lateinit var playerAdapter: PlayerAdapter
 
     private lateinit var chatMessageAdapter: ChatMessageAdapter
 
     private var updateChatJob: Job? = null // there is only one job that updates our RecyclerView
+    private var updatePlayersJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDrawingBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this) // 'this' is LifecycleObserver interface
         subscribeToUiStateUpdates()
         listenToConnectionEvents()
         listenToSocketEvents()
@@ -70,6 +75,11 @@ class DrawingActivity : AppCompatActivity() {
         val header = layoutInflater.inflate(R.layout.nav_drawer_header, binding.navView)
         rvPlayers = header.findViewById(R.id.rvPlayers)
         binding.root.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED) // nav drawer closed
+
+        rvPlayers.apply {
+            adapter = playerAdapter
+            layoutManager = LinearLayoutManager(this@DrawingActivity)
+        }
 
         binding.ibPlayers.setOnClickListener {
             binding.root.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
@@ -197,6 +207,12 @@ class DrawingActivity : AppCompatActivity() {
             }
         }
 
+        lifecycleScope.launchWhenStarted { // when we receive new players from the server, update
+            viewModel.players.collect { players ->
+                updatePlayersList(players)
+            }
+        }
+
         lifecycleScope.launchWhenStarted {
             viewModel.phaseTime.collect { time ->
                 binding.roundTimerProgressBar.progress = time.toInt()
@@ -307,6 +323,10 @@ class DrawingActivity : AppCompatActivity() {
                         }
                     }
                 }
+                // once a player leaves and rejoins, update the screen with the latest info
+                is DrawingViewModel.SocketEvent.RoundDrawInfoEvent -> {
+                    binding.drawingView.update(event.data)
+                }
                 // when we are about to start, clear everything
                 is DrawingViewModel.SocketEvent.GameStateEvent -> {
                     binding.drawingView.clear()
@@ -368,6 +388,13 @@ class DrawingActivity : AppCompatActivity() {
         }
     }
 
+    private fun updatePlayersList(players: List<PlayerData>) {
+        updatePlayersJob?.cancel()
+        updatePlayersJob = lifecycleScope.launch {
+            playerAdapter.updateDataSet(players)
+        }
+    }
+
     private suspend fun addChatObjectToRecyclerView(chatObject: BaseModel) {
         val canScrollDown = binding.rvChat.canScrollVertically(1) // positive: scroll down
         updateChatMessageList(chatMessageAdapter.chatObjects + chatObject)
@@ -396,5 +423,13 @@ class DrawingActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         binding.rvChat.layoutManager?.onSaveInstanceState() // state of RecyclerView is saved
+    }
+
+    // gets called by LifecycleObserver interface
+    // why not override onPause(): becuase we launch a dialog to ask permission for mic usage,
+    // which calls onStop(). that is not what we want
+    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
+    private fun onAppInBackground() {
+        viewModel.disconnect()
     }
 }
