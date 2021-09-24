@@ -8,11 +8,16 @@ import com.tsato.mobile.ekaki.R
 import com.tsato.mobile.ekaki.data.models.*
 import com.tsato.mobile.ekaki.data.models.DrawAction.Companion.ACTION_UNDO
 import com.tsato.mobile.ekaki.data.remote.ws.DrawingApi
+import com.tsato.mobile.ekaki.data.remote.ws.Room
+import com.tsato.mobile.ekaki.ui.views.DrawingView
+import com.tsato.mobile.ekaki.util.CoroutineTimer
 import com.tsato.mobile.ekaki.util.DispatcherProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.*
 import javax.inject.Inject
 
 @HiltViewModel
@@ -36,6 +41,22 @@ class DrawingViewModel @Inject constructor(
         object UndoEvent : SocketEvent()
     }
 
+    // needed to restore the state that was lost upon configuration change
+    private val _pathData = MutableStateFlow(Stack<DrawingView.PathData>())
+    val pathData: StateFlow<Stack<DrawingView.PathData>> = _pathData
+
+    private val _phase = MutableStateFlow(PhaseChange(null, 0L, null))
+    val phase: StateFlow<PhaseChange> = _phase
+
+    private val _phaseTime = MutableStateFlow(0L)
+    val phaseTime: StateFlow<Long> = _phaseTime
+
+    private val _gameState = MutableStateFlow(GameState("", ""))
+    val gameState: StateFlow<GameState> = _gameState
+
+    private val _newWords = MutableStateFlow(NewWords(listOf()))
+    val newWords: StateFlow<NewWords> = _newWords
+
     private val _chat = MutableStateFlow<List<BaseModel>>(listOf())
     val chat: StateFlow<List<BaseModel>> = _chat
 
@@ -56,9 +77,27 @@ class DrawingViewModel @Inject constructor(
     private val socketEventChannel = Channel<SocketEvent>()
     val socketEvent = socketEventChannel.receiveAsFlow().flowOn(dispatchers.io)
 
+    private val coroutineTimer = CoroutineTimer()
+    private var timerJob: Job? = null
+
     init {
         observeBaseModels()
         observeEvents()
+    }
+
+    fun cancelTimer() {
+        timerJob?.cancel()
+    }
+
+    private fun setTimer(duration: Long) {
+        timerJob?.cancel()
+        timerJob = coroutineTimer.timeAndEmit(duration, viewModelScope) {
+            _phaseTime.value = it
+        }
+    }
+
+    fun setPathData(stack: Stack<DrawingView.PathData>) {
+        _pathData.value = stack
     }
 
     fun setChooseWordOverlayVisibility(isVisible: Boolean) {
@@ -93,12 +132,37 @@ class DrawingViewModel @Inject constructor(
                     is ChatMessage -> {
                         socketEventChannel.send(SocketEvent.ChatMessageEvent(data))
                     }
+                    is ChosenWord -> {
+                        socketEventChannel.send(SocketEvent.ChosenWordEvent(data))
+                    }
                     is Announcement -> {
                         socketEventChannel.send(SocketEvent.AnnouncementEvent(data))
+                    }
+                    is GameState -> {
+                        _gameState.value = data
+                        socketEventChannel.send(SocketEvent.GameStateEvent(data))
+                    }
+                    is NewWords -> {
+                        _newWords.value = data
+                        socketEventChannel.send(SocketEvent.NewWordsEvent(data))
                     }
                     is DrawAction -> {
                         when (data.action) {
                             ACTION_UNDO -> socketEventChannel.send(SocketEvent.UndoEvent)
+                        }
+                    }
+                    is PhaseChange -> {
+                        // if data.phase is null, we would lose track of phase upon configuration change
+                        data.phase?.let {
+                            _phase.value = data
+                        }
+
+                        // time cannot be null
+                        _phaseTime.value = data.time
+
+                        // WAITING_FOR_PLAYERS is the phase the we don't need timer
+                        if (data.phase != Room.Phase.WAITING_FOR_PLAYERS) {
+                            setTimer(data.time)
                         }
                     }
                     is Ping -> {
@@ -110,6 +174,11 @@ class DrawingViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun chooseWord(word: String, roomName: String) {
+        val chosenWord = ChosenWord(word, roomName)
+        sendBaseModel(chosenWord)
     }
 
     fun sendChatMessage(message: ChatMessage) {

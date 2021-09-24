@@ -21,6 +21,7 @@ import com.tinder.scarlet.WebSocket
 import com.tsato.mobile.ekaki.R
 import com.tsato.mobile.ekaki.adapters.ChatMessageAdapter
 import com.tsato.mobile.ekaki.data.models.*
+import com.tsato.mobile.ekaki.data.remote.ws.Room
 import com.tsato.mobile.ekaki.databinding.ActivityDrawingBinding
 import com.tsato.mobile.ekaki.util.Constants
 import com.tsato.mobile.ekaki.util.hideKeyboard
@@ -110,6 +111,10 @@ class DrawingActivity : AppCompatActivity() {
             }
         }
 
+        binding.drawingView.setPathDataChangedListener {
+            viewModel.setPathData(it)
+        }
+
         binding.colorGroup.setOnCheckedChangeListener { _, checkedId ->
             viewModel.checkRadioButton(checkedId)
         }
@@ -121,11 +126,25 @@ class DrawingActivity : AppCompatActivity() {
         }
     }
 
+    private fun setColorGroupVisibility(isVisible: Boolean) {
+        binding.colorGroup.isVisible = isVisible
+        binding.ibUndo.isVisible = isVisible
+    }
+
+    private fun setMessageInputVisibility(isVisible: Boolean) {
+        binding.apply {
+            tilMessage.isVisible = isVisible
+            ibSend.isVisible = isVisible
+            ibClearText.isVisible = isVisible
+        }
+    }
+
     private fun selectColor(color: Int) {
         binding.drawingView.setColor(color)
         binding.drawingView.setThickness(Constants.DEFAULT_PAINT_THICKNESS)
     }
 
+    // collect(observe) state flows
     private fun subscribeToUiStateUpdates() {
         lifecycleScope.launchWhenStarted {
             viewModel.chat.collect { chat ->
@@ -134,6 +153,105 @@ class DrawingActivity : AppCompatActivity() {
                 }
             }
         }
+
+        lifecycleScope.launchWhenStarted {
+            viewModel.newWords.collect {
+                val newWords = it.newWords
+
+                if (newWords.isEmpty()) // initial emission
+                    return@collect
+
+                binding.apply {
+                    btnFirstWord.text = newWords[0]
+                    btnSecondWord.text = newWords[1]
+                    btnThirdWord.text = newWords[2]
+                    btnFirstWord.setOnClickListener {
+                        viewModel.chooseWord(newWords[0], args.roomName)
+                        viewModel.setChooseWordOverlayVisibility(false)
+                    }
+                    btnSecondWord.setOnClickListener {
+                        viewModel.chooseWord(newWords[1], args.roomName)
+                        viewModel.setChooseWordOverlayVisibility(false)
+                    }
+                    btnThirdWord.setOnClickListener {
+                        viewModel.chooseWord(newWords[2], args.roomName)
+                        viewModel.setChooseWordOverlayVisibility(false)
+                    }
+                }
+            }
+        }
+
+        lifecycleScope.launchWhenStarted {
+            viewModel.gameState.collect { gameState ->
+                binding.apply {
+                    tvCurWord.text = gameState.word // plain text for the drawing player or the underscored word for the others
+
+                    val isUserDrawing = gameState.drawingPlayer == args.userName
+                    setColorGroupVisibility(isUserDrawing) // if drawing, show color groups
+                    setMessageInputVisibility(!isUserDrawing) // if not drawing, show message box
+                    drawingView.isUserDrawing = isUserDrawing
+                    ibUndo.isEnabled = isUserDrawing
+                    ibMic.isVisible = !isUserDrawing
+                    drawingView.isEnabled = isUserDrawing
+                }
+            }
+        }
+
+        lifecycleScope.launchWhenStarted {
+            viewModel.phaseTime.collect { time ->
+                binding.roundTimerProgressBar.progress = time.toInt()
+                binding.tvRemainingTimeChooseWord.text = (time / 1000L).toString()
+            }
+        }
+
+        lifecycleScope.launchWhenStarted {
+            viewModel.phase.collect { phaseChange ->
+                when (phaseChange.phase) {
+                    Room.Phase.WAITING_FOR_PLAYERS -> {
+                        binding.tvCurWord.text = getString(R.string.waiting_for_players)
+                        viewModel.cancelTimer()
+                        viewModel.setConnectionProgressBarVisibility(false)
+                        binding.roundTimerProgressBar.progress = binding.roundTimerProgressBar.max
+                    }
+                    Room.Phase.WAITING_FOR_START -> {
+                        binding.roundTimerProgressBar.progress = phaseChange.time.toInt()
+                        binding.tvCurWord.text = getString(R.string.waiting_for_start)
+                    }
+                    Room.Phase.NEW_ROUND -> {
+                        phaseChange.drawingPlayer?.let { drawingPlayer ->
+                            binding.tvCurWord.text = getString(R.string.player_is_drawing, drawingPlayer)
+                        }
+                        binding.apply {
+                            drawingView.isEnabled = false // nobody should be able to draw
+                            drawingView.setColor(Color.BLACK)
+                            drawingView.setThickness(Constants.DEFAULT_PAINT_THICKNESS)
+                            roundTimerProgressBar.max = phaseChange.time.toInt()
+
+                            val isPlayerDrawer = phaseChange.drawingPlayer == args.userName
+                            binding.chooseWordOverlay.isVisible = isPlayerDrawer
+                        }
+                    }
+                    Room.Phase.GAME_RUNNING -> {
+                        binding.chooseWordOverlay.isVisible = false
+                        binding.roundTimerProgressBar.max = phaseChange.time.toInt()
+                    }
+                    Room.Phase.AFTER_GAME -> {
+                        binding.apply {
+                            if (drawingView.isDrawing) {
+                                drawingView.finishOffDrawing()
+                            }
+
+                            drawingView.isEnabled = false // nobody should be able to draw
+                            drawingView.setColor(Color.BLACK)
+                            drawingView.setThickness(Constants.DEFAULT_PAINT_THICKNESS)
+                            roundTimerProgressBar.max = phaseChange.time.toInt()
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+
         lifecycleScope.launchWhenStarted {
             viewModel.selectedColorButtonId.collect { id ->
                 binding.colorGroup.check(id)
@@ -188,6 +306,15 @@ class DrawingActivity : AppCompatActivity() {
                             }
                         }
                     }
+                }
+                // when we are about to start, clear everything
+                is DrawingViewModel.SocketEvent.GameStateEvent -> {
+                    binding.drawingView.clear()
+                }
+                // receiving chosenWord means another player is the drawer
+                is DrawingViewModel.SocketEvent.ChosenWordEvent -> {
+                    binding.tvCurWord.text = event.data.chosenWord
+                    binding.ibUndo.isEnabled = false
                 }
                 is DrawingViewModel.SocketEvent.ChatMessageEvent -> {
                     addChatObjectToRecyclerView(event.data)

@@ -103,7 +103,7 @@ class DrawingView @JvmOverloads constructor(
     }
 
     fun undo() {
-        if (!paths.isEmpty()) {
+        if (paths.isNotEmpty()) {
             paths.pop()
             pathDataChangedListener?.let { change ->
                 change(paths)
@@ -255,11 +255,24 @@ class DrawingView @JvmOverloads constructor(
             paint.color,
             paint.strokeWidth,
             fromX / viewWidth!!, // don't use absolute coordinates. use percentage
-        fromY / viewHeight!!, // it has to be proportionate to the screen size of the phone
+            fromY / viewHeight!!, // it has to be proportionate to the screen size of the phone
             toX / viewWidth!!,
             toY / viewHeight!!,
             motionEvent
         )
+    }
+
+    // called when the timer runs out but the drawer is still drawing the last path
+    fun finishOffDrawing() {
+        isDrawing = false
+        path.lineTo(currX ?: return, currY ?: return)
+        canvas?.drawPath(path, paint)
+        paths.push(PathData(path, paint.color, paint.strokeWidth))
+        pathDataChangedListener?.let { change ->
+            change(paths)
+        }
+        path = Path()
+        invalidate()
     }
 
     fun setThickness(thickness: Float) {
