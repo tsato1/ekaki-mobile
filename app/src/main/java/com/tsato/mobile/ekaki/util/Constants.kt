@@ -25,6 +25,8 @@ object Constants {
 
     const val RECONNECT_INTERVAL = 3000L
 
+    const val MAX_WORD_VOICE_GUESS_AMOUNT = 3
+
     // From backend
     const val TYPE_CHAT_MESSAGE = "TYPE_CHAT_MESSAGE"
     const val TYPE_DRAW_DATA = "TYPE_DRAW_DATA"

@@ -47,7 +47,7 @@ class DrawingViewModel @Inject constructor(
     private val _players = MutableStateFlow<List<PlayerData>>(listOf())
     val players: StateFlow<List<PlayerData>> = _players
 
-    // needed to restore the state that was lost upon configuration change
+    // currently drawn paths: needed to restore the state that was lost upon configuration change
     private val _pathData = MutableStateFlow(Stack<DrawingView.PathData>())
     val pathData: StateFlow<Stack<DrawingView.PathData>> = _pathData
 
@@ -74,6 +74,9 @@ class DrawingViewModel @Inject constructor(
 
     private val _chooseWordOverlayVisible = MutableStateFlow(false)
     val chooseWordOverlayVisible: StateFlow<Boolean> = _chooseWordOverlayVisible
+
+    private val _speechToTextEnabled = MutableStateFlow(false)
+    val speechToTextEnabled: StateFlow<Boolean> = _speechToTextEnabled
 
     // this is the channel in which we sends events
     private val connectionEventChannel = Channel<WebSocket.Event>()
@@ -222,5 +225,13 @@ class DrawingViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.io) {
             drawingApi.sendBaseModel(data)
         }
+    }
+
+    fun startListening() {
+        _speechToTextEnabled.value = true
+    }
+
+    fun stopListening() {
+        _speechToTextEnabled.value = false
     }
 }

@@ -312,5 +312,9 @@ class DrawingView @JvmOverloads constructor(
         paths.clear()
     }
 
+    fun setPaths(pathData: Stack<PathData>) {
+        this.paths = pathData
+    }
+
     data class PathData (val path: Path, val color: Int, val thickness: Float)
 }
