@@ -24,6 +24,7 @@ import com.tsato.mobile.ekaki.adapters.PlayerAdapter
 import com.tsato.mobile.ekaki.data.models.*
 import com.tsato.mobile.ekaki.data.remote.ws.Room
 import com.tsato.mobile.ekaki.databinding.ActivityDrawingBinding
+import com.tsato.mobile.ekaki.ui.dialogs.LeaveDialog
 import com.tsato.mobile.ekaki.util.Constants
 import com.tsato.mobile.ekaki.util.hideKeyboard
 import dagger.hilt.android.AndroidEntryPoint
@@ -423,6 +424,15 @@ class DrawingActivity : AppCompatActivity(), LifecycleObserver {
     override fun onPause() {
         super.onPause()
         binding.rvChat.layoutManager?.onSaveInstanceState() // state of RecyclerView is saved
+    }
+
+    override fun onBackPressed() {
+        LeaveDialog().apply {
+            setOnPositiveClickListener {
+                viewModel.disconnect()
+                finish()
+            }
+        }.show(supportFragmentManager, null)
     }
 
     // gets called by LifecycleObserver interface
